@@ -13,9 +13,10 @@ import { errorHandler } from './middlewares/error.middleware.js'
 const app = express()
 const swaggerDocument = YAML.load('./src/docs/openapi.yaml')
 
+const defaultOrigins = ['http://localhost:5173', 'https://choral-record-frontend.vercel.app'];
 const allowedOrigins = process.env.FRONTEND_URL 
-    ? process.env.FRONTEND_URL.split(',').map(o => o.trim()) 
-    : ['http://localhost:5173', 'https://choral-record-frontend.vercel.app'];
+    ? [...defaultOrigins, ...process.env.FRONTEND_URL.split(',').map(o => o.trim())]
+    : defaultOrigins;
 
 app.use(cors({
     origin: function (origin, callback) {
