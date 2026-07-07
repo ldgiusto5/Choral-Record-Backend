@@ -17,8 +17,11 @@ import {
     updateEventValidation
 } from '../validations/event.validation.js'
 import { param } from 'express-validator'
+import { resolveChoirIdParam } from '../middlewares/resolveChoirId.middleware.js'
 
 const router = Router()
+
+router.param('id', resolveChoirIdParam)
 
 // Listar eventos de coros seguidos (Colocado antes de rutas con parámetros variables para evitar colisión)
 router.get('/events/followed', authMiddleware, listFollowedChoirsEvents)

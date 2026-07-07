@@ -67,6 +67,19 @@ export const createChoir = async ({ name, description, image_file, place, countr
     const creatorId = createdBy || created_by
     const visibility = isPublic !== undefined ? isPublic : (is_public !== undefined ? is_public : true)
 
+    // Check duplicate name (case-insensitive)
+    const { data: existingName } = await supabase
+        .from('choirs')
+        .select('id')
+        .ilike('name', name)
+        .maybeSingle()
+
+    if (existingName) {
+        const err = new Error('Ya existe un coro con ese nombre')
+        err.code = 'ER_DUP_ENTRY'
+        throw err
+    }
+
     const { data, error } = await supabase
         .from('choirs')
         .insert([
@@ -119,6 +132,21 @@ export const createChoir = async ({ name, description, image_file, place, countr
 }
 
 export const updateChoir = async (id, updateData) => {
+    if (updateData.name) {
+        const { data: existingName } = await supabase
+            .from('choirs')
+            .select('id')
+            .ilike('name', updateData.name)
+            .neq('id', id)
+            .maybeSingle()
+
+        if (existingName) {
+            const err = new Error('Ya existe un coro con ese nombre')
+            err.code = 'ER_DUP_ENTRY'
+            throw err
+        }
+    }
+
     const { data, error } = await supabase
         .from('choirs')
         .update(updateData)
@@ -171,12 +199,14 @@ export const findAllChoirs = async () => {
     return await Promise.all((data || []).map(c => mapChoirStats(c)))
 }
 
-export const findChoirById = async (id) => {
-    const { data, error } = await supabase
-        .from('choirs')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
+export const findChoirById = async (idOrName) => {
+    let query = supabase.from('choirs').select('*')
+    if (idOrName !== undefined && idOrName !== null && !isNaN(idOrName) && Number.isInteger(Number(idOrName))) {
+        query = query.eq('id', Number(idOrName))
+    } else {
+        query = query.eq('name', idOrName)
+    }
+    const { data, error } = await query.maybeSingle()
 
     if (error) {
         console.error('Error in findChoirById:', error)

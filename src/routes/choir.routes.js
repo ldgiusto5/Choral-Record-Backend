@@ -5,8 +5,11 @@ import { authMiddleware } from '../middlewares/auth.middleware.js'
 import { validateRequest } from '../middlewares/validateRequest.middleware.js'
 import { requireChoirAdmin } from '../middlewares/choirAuth.middleware.js'
 import { createChoirValidation, choirIdValidation, updateChoirValidation } from '../validations/choir.validation.js'
+import { resolveChoirIdParam } from '../middlewares/resolveChoirId.middleware.js'
 
 const router = Router()
+
+router.param('id', resolveChoirIdParam)
 
 // Rutas públicas (con token opcional para verificar estatus del usuario dentro del controlador)
 router.get('/choirs', list)

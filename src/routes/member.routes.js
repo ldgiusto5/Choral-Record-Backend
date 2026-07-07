@@ -15,8 +15,11 @@ import {
     updateMemberStatusValidation,
     updateMemberRoleValidation
 } from '../validations/choir.validation.js'
+import { resolveChoirIdParam } from '../middlewares/resolveChoirId.middleware.js'
 
 const router = Router()
+
+router.param('id', resolveChoirIdParam)
 
 // Solicitar unirse a un coro
 router.post(

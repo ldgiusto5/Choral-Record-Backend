@@ -19,8 +19,11 @@ import {
     swapPieceValidation,
     reorderPieceValidation
 } from '../validations/piece.validation.js'
+import { resolveChoirIdParam } from '../middlewares/resolveChoirId.middleware.js'
 
 const router = Router()
+
+router.param('id', resolveChoirIdParam)
 
 const uploadPieceFields = uploadPieceFiles.fields([
     { name: 'partitura', maxCount: 1 },
