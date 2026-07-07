@@ -13,8 +13,20 @@ import { errorHandler } from './middlewares/error.middleware.js'
 const app = express()
 const swaggerDocument = YAML.load('./src/docs/openapi.yaml')
 
+const allowedOrigins = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.split(',').map(o => o.trim()) 
+    : ['http://localhost:5173', 'https://choral-record-frontend.vercel.app'];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS bloqueó esta petición'));
+        }
+    },
+    credentials: true
 }))
 
 app.use(express.json())
