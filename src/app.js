@@ -11,6 +11,7 @@ import { notFound } from './middlewares/notFound.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
 const app = express()
+app.set('trust proxy', true)
 const swaggerDocument = YAML.load('./src/docs/openapi.yaml')
 
 const defaultOrigins = ['http://localhost:5173', 'https://choral-record-frontend.vercel.app'];
