@@ -1,14 +1,14 @@
 import { createChoir, findAllChoirs, findChoirById, findUserChoirStatus, updateChoir, deleteChoir, findChoirsByUser, followChoir, unfollowChoir, getFollowStatus, getFollowersCount, findFollowedChoirsByUser, getChoirFollowers } from '../services/choir.service.js'
 import { findUserByUsername, findUserById } from '../services/auth.service.js'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
+import { uploadFile, deleteFile, getPublicUrl } from '../services/storage.service.js'
 
 // Helper para dar formato a la URL de la imagen del coro
 const formatChoirImageUrl = (choir, req) => {
     if (!choir) return null
     const formatted = { ...choir }
     if (formatted.image_file) {
-        formatted.image_file = `${req.protocol}://${req.get('host')}/uploads/choirs/${formatted.image_file}`
+        formatted.image_file = getPublicUrl(formatted.image_file, 'choirs')
     }
     return formatted
 }
@@ -41,8 +41,12 @@ export const create = async (req, res, next) => {
     try {
         const { name, description, is_public, place, country } = req.body
         const createdBy = req.user.id
-        const imageFile = req.file?.filename || null
         const isPublic = parseBoolean(is_public)
+
+        let imageFile = null
+        if (req.file) {
+            imageFile = await uploadFile(req.file, 'choirs')
+        }
 
         const user = await findUserById(createdBy)
         const creatorName = user ? user.name : ''
@@ -63,17 +67,6 @@ export const create = async (req, res, next) => {
             choir: formatChoirImageUrl(choir, req)
         })
     } catch (error) {
-        // Limpiar archivo subido si ocurre un error
-        if (req.file) {
-            try {
-                if (fs.existsSync(req.file.path)) {
-                    fs.unlinkSync(req.file.path)
-                }
-            } catch (err) {
-                console.error('Error al eliminar imagen de coro temporal:', err)
-            }
-        }
-
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({
                 message: 'Ya existe un coro con ese nombre'
@@ -142,8 +135,20 @@ export const update = async (req, res, next) => {
     try {
         const { id } = req.params
         const { name, description, is_public, place, country } = req.body
-        const imageFile = req.file?.filename || undefined
         const isPublic = parseBoolean(is_public)
+
+        const existingChoir = await findChoirById(id)
+        if (!existingChoir) {
+            return res.status(404).json({ message: 'Coro no encontrado' })
+        }
+
+        let imageFile = undefined
+        if (req.file) {
+            if (existingChoir.image_file) {
+                await deleteFile(existingChoir.image_file, 'choirs')
+            }
+            imageFile = await uploadFile(req.file, 'choirs')
+        }
 
         // Llamar al servicio para actualizar el coro
         const updatedChoir = await updateChoir(id, {
@@ -160,17 +165,6 @@ export const update = async (req, res, next) => {
             choir: formatChoirImageUrl(updatedChoir, req)
         })
     } catch (error) {
-        // Limpiar archivo subido si ocurre un error
-        if (req.file) {
-            try {
-                if (fs.existsSync(req.file.path)) {
-                    fs.unlinkSync(req.file.path)
-                }
-            } catch (err) {
-                console.error('Error al eliminar imagen de coro temporal:', err)
-            }
-        }
-
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({
                 message: 'Ya existe un coro con ese nombre'
@@ -183,6 +177,11 @@ export const update = async (req, res, next) => {
 export const remove = async (req, res, next) => {
     try {
         const { id } = req.params
+        const choir = await findChoirById(id)
+        if (choir && choir.image_file) {
+            await deleteFile(choir.image_file, 'choirs')
+        }
+
         const deletedRows = await deleteChoir(id)
         if (deletedRows === 0) {
             return res.status(404).json({ message: 'Coro no encontrado' })

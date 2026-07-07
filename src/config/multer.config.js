@@ -1,24 +1,7 @@
 import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
 
-// Asegurar que exista la carpeta de subida
-const uploadDir = 'src/uploads/pieces'
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true })
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir)
-    },
-    filename: (req, file, cb) => {
-        // Generar un nombre único preservando la extensión
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`
-        const extension = path.extname(file.originalname)
-        cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`)
-    }
-})
+// Usar almacenamiento en memoria para delegar la persistencia a Supabase Storage
+const storage = multer.memoryStorage()
 
 const fileFilter = (req, file, cb) => {
     const docMimetypes = [
@@ -68,23 +51,6 @@ export const uploadPieceFiles = multer({
     }
 })
 
-// Configuración para las fotos de los coros
-const choirDir = 'src/uploads/choirs'
-if (!fs.existsSync(choirDir)) {
-    fs.mkdirSync(choirDir, { recursive: true })
-}
-
-const choirStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, choirDir)
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`
-        const extension = path.extname(file.originalname)
-        cb(null, `choir-${uniqueSuffix}${extension}`)
-    }
-})
-
 const choirFileFilter = (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
     if (!allowedTypes.includes(file.mimetype)) {
@@ -94,27 +60,10 @@ const choirFileFilter = (req, file, cb) => {
 }
 
 export const uploadChoirImage = multer({
-    storage: choirStorage,
+    storage,
     fileFilter: choirFileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024 // Límite de 5MB para la foto de perfil del coro
-    }
-})
-
-// Configuración para las fotos de perfil de usuarios
-const profileDir = 'src/uploads/profiles'
-if (!fs.existsSync(profileDir)) {
-    fs.mkdirSync(profileDir, { recursive: true })
-}
-
-const profileStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, profileDir)
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`
-        const extension = path.extname(file.originalname)
-        cb(null, `profile-${uniqueSuffix}${extension}`)
+        fileSize: 5 * 1024 * 1024 // Límite de 5MB
     }
 })
 
@@ -127,27 +76,10 @@ const profileFileFilter = (req, file, cb) => {
 }
 
 export const uploadProfileImage = multer({
-    storage: profileStorage,
+    storage,
     fileFilter: profileFileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024 // Límite de 5MB para la foto de perfil
-    }
-})
-
-// Configuración para los eventos (imagen y PDF de información)
-const eventDir = 'src/uploads/events'
-if (!fs.existsSync(eventDir)) {
-    fs.mkdirSync(eventDir, { recursive: true })
-}
-
-const eventStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, eventDir)
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`
-        const extension = path.extname(file.originalname)
-        cb(null, `event-${file.fieldname}-${uniqueSuffix}${extension}`)
+        fileSize: 5 * 1024 * 1024 // Límite de 5MB
     }
 })
 
@@ -175,7 +107,7 @@ const eventFileFilter = (req, file, cb) => {
 }
 
 export const uploadEventFiles = multer({
-    storage: eventStorage,
+    storage,
     fileFilter: eventFileFilter,
     limits: {
         fileSize: 15 * 1024 * 1024 // Límite de 15MB

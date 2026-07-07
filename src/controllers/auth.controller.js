@@ -14,6 +14,7 @@ import { findUserByEmail,
  } from '../services/auth.service.js'
 import { hardDeleteUser } from '../services/user.service.js'
 import { createRefreshToken, findRefreshToken, deleteRefreshToken, deleteAllUserRefreshTokens } from '../services/token.service.js'
+import { uploadFile, deleteFile, getPublicUrl } from '../services/storage.service.js'
 
 const hashToken = (token) => {
     return crypto.createHash('sha256').update(token).digest('hex')
@@ -27,7 +28,7 @@ const formatUserAvatarUrl = (user, req) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
     formatted.profile_image_url = formatted.user_image
-        ? `${baseUrl}/uploads/profiles/${formatted.user_image}`
+        ? getPublicUrl(formatted.user_image, 'profiles')
         : `${baseUrl}/assets/default-avatar.png`
 
     return formatted
@@ -216,7 +217,6 @@ export const editProfile = async (req, res, next) => {
 
         // Solo el propietario puede editar su perfil
         if (Number(targetUser.id) !== Number(requesterId)) {
-            if (file) fs.unlinkSync(file.path)
             return res.status(403).json({ message: 'No autorizado para editar este perfil' })
         }
 
@@ -225,12 +225,10 @@ export const editProfile = async (req, res, next) => {
             if (username !== targetUser.username) {
                 // El username no puede contener solo números para evitar colisión con IDs
                 if (/^\d+$/.test(username)) {
-                    if (file) fs.unlinkSync(file.path)
                     return res.status(400).json({ message: 'El nombre de usuario no puede contener solo números' })
                 }
                 const usernameInUse = await findUserByUsername(username)
                 if (usernameInUse) {
-                    if (file) fs.unlinkSync(file.path)
                     return res.status(400).json({ message: 'Nombre de usuario ya registrado' })
                 }
             }
@@ -244,7 +242,6 @@ export const editProfile = async (req, res, next) => {
                 return res.status(400).json({ message: 'Debes proporcionar la nueva contraseña y su confirmación' })
             }
             if (newPassword !== confirmPassword) {
-                if (file) fs.unlinkSync(file.path)
                 return res.status(400).json({ message: 'Las nuevas contraseñas no coinciden' })
             }
 
@@ -255,13 +252,11 @@ export const editProfile = async (req, res, next) => {
                 .single()
 
             if (dbError || !dbUser) {
-                if (file) fs.unlinkSync(file.path)
                 return res.status(500).json({ message: 'Error al verificar la contraseña' })
             }
 
             const isPasswordValid = await bcrypt.compare(currentPassword, dbUser.password)
             if (!isPasswordValid) {
-                if (file) fs.unlinkSync(file.path)
                 return res.status(400).json({ message: 'La contraseña actual es incorrecta' })
             }
 
@@ -277,28 +272,20 @@ export const editProfile = async (req, res, next) => {
 
         // Manejo del archivo de imagen
         if (file) {
-            // Si el usuario tiene una imagen anterior, eliminarla
+            // Si el usuario tiene una imagen anterior, eliminarla en Supabase
             if (targetUser.user_image) {
-                const oldImagePath = path.join('src/uploads/profiles', targetUser.user_image)
-                try {
-                    if (fs.existsSync(oldImagePath)) {
-                        fs.unlinkSync(oldImagePath)
-                    }
-                } catch (err) {
-                    console.error(`Error borrando imagen anterior: ${oldImagePath}`, err)
-                }
+                await deleteFile(targetUser.user_image, 'profiles')
             }
-            updateData.user_image = file.filename
+            const uploadedFilename = await uploadFile(file, 'profiles')
+            updateData.user_image = uploadedFilename
         }
 
         if (Object.keys(updateData).length === 0) {
-            if (file) fs.unlinkSync(file.path)
             return res.status(400).json({ message: 'No hay datos para actualizar' })
         }
 
         const updated = await updateUser(targetUser.id, updateData)
         if (!updated) {
-            if (file) fs.unlinkSync(file.path)
             return res.status(500).json({ message: 'No se pudo actualizar el perfil' })
         }
 
@@ -308,13 +295,6 @@ export const editProfile = async (req, res, next) => {
             user: updatedUser
         })
     } catch (error) {
-        if (req.file) {
-            try {
-                fs.unlinkSync(req.file.path)
-            } catch (err) {
-                console.error('Error limpiando archivo en caso de error:', err)
-            }
-        }
         console.error(error)
         res.status(500).json({ message: 'Error al actualizar perfil' })
     }
@@ -345,16 +325,9 @@ export const deleteProfileImage = async (req, res, next) => {
             return res.status(403).json({ message: 'No autorizado para eliminar la imagen de este perfil' });
         }
 
-        // Si el usuario tiene una imagen, eliminarla del sistema de archivos
+        // Si el usuario tiene una imagen, eliminarla de Supabase Storage
         if (targetUser.user_image) {
-            const imagePath = path.join('src/uploads/profiles', targetUser.user_image);
-            try {
-                if (fs.existsSync(imagePath)) {
-                    fs.unlinkSync(imagePath);
-                }
-            } catch (err) {
-                console.error(`Error borrando imagen: ${imagePath}`, err);
-            }
+            await deleteFile(targetUser.user_image, 'profiles');
         }
 
         // Actualizar user_image a NULL en la base de datos
