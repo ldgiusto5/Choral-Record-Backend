@@ -1,20 +1,19 @@
 import { createEvent, findEventsByChoir, findEventById, updateEvent, deleteEvent, findPublicEventsByChoir, findFollowedChoirsEvents } from '../services/event.service.js'
 import { supabase } from '../database/connection.js'
-import fs from 'fs'
+import { uploadFile, deleteFile, getPublicUrl } from '../services/storage.service.js'
 
 const formatEventUrls = (event, req) => {
     if (!event) return null
     const formatted = { ...event }
-    const baseUrl = `${req.protocol}://${req.get('host')}`
     
     if (formatted.image_file) {
-        formatted.image_url = `${baseUrl}/uploads/events/${formatted.image_file}`
+        formatted.image_url = getPublicUrl(formatted.image_file, 'events')
     } else {
         formatted.image_url = null
     }
 
     if (formatted.info_file) {
-        formatted.info_url = `${baseUrl}/uploads/events/${formatted.info_file}`
+        formatted.info_url = getPublicUrl(formatted.info_file, 'events')
     } else {
         formatted.info_url = null
     }
@@ -32,22 +31,8 @@ const formatEventUrls = (event, req) => {
     return formatted
 }
 
-const cleanupUploadedFiles = (files) => {
-    if (!files) return
-    const fileList = []
-    if (files.image && files.image[0]) fileList.push(files.image[0].path)
-    if (files.info && files.info[0]) fileList.push(files.info[0].path)
-
-    fileList.forEach(filePath => {
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath)
-            }
-        } catch (err) {
-            console.error('Error al limpiar archivo temporal de evento:', err)
-        }
-    })
-}
+// Limpia archivos temporales (no-op para memoryStorage)
+const cleanupUploadedFiles = (files) => {}
 
 export const create = async (req, res, next) => {
     try {
@@ -55,8 +40,15 @@ export const create = async (req, res, next) => {
         const createdBy = req.user.id
         const { title, description, event_date, is_visible, is_public } = req.body
 
-        const imageFile = req.files?.image?.[0]?.filename || null
-        const infoFile = req.files?.info?.[0]?.filename || null
+        let imageFile = null
+        let infoFile = null
+
+        if (req.files?.image?.[0]) {
+            imageFile = await uploadFile(req.files.image[0], 'events')
+        }
+        if (req.files?.info?.[0]) {
+            infoFile = await uploadFile(req.files.info[0], 'events')
+        }
 
         // Convertir is_visible a booleano si se envía
         let isVisible = undefined
@@ -183,7 +175,8 @@ export const update = async (req, res, next) => {
         let oldInfoFileToDelete = null
 
         if (req.files?.image?.[0]) {
-            updateData.image_file = req.files.image[0].filename
+            const uploadedFilename = await uploadFile(req.files.image[0], 'events')
+            updateData.image_file = uploadedFilename
             if (event.image_file) {
                 oldImageFileToDelete = event.image_file
             }
@@ -195,7 +188,8 @@ export const update = async (req, res, next) => {
         }
 
         if (req.files?.info?.[0]) {
-            updateData.info_file = req.files.info[0].filename
+            const uploadedFilename = await uploadFile(req.files.info[0], 'events')
+            updateData.info_file = uploadedFilename
             if (event.info_file) {
                 oldInfoFileToDelete = event.info_file
             }
@@ -208,27 +202,13 @@ export const update = async (req, res, next) => {
 
         const updatedEvent = await updateEvent(eventId, updateData)
 
-        // Limpiar archivos anteriores del disco
+        // Limpiar archivos anteriores de Supabase Storage
         if (oldImageFileToDelete) {
-            const oldPath = `src/uploads/events/${oldImageFileToDelete}`
-            try {
-                if (fs.existsSync(oldPath)) {
-                    fs.unlinkSync(oldPath)
-                }
-            } catch (err) {
-                console.error('Error al eliminar imagen antigua del evento:', err)
-            }
+            await deleteFile(oldImageFileToDelete, 'events')
         }
 
         if (oldInfoFileToDelete) {
-            const oldPath = `src/uploads/events/${oldInfoFileToDelete}`
-            try {
-                if (fs.existsSync(oldPath)) {
-                    fs.unlinkSync(oldPath)
-                }
-            } catch (err) {
-                console.error('Error al eliminar archivo adjunto antiguo del evento:', err)
-            }
+            await deleteFile(oldInfoFileToDelete, 'events')
         }
 
         res.json({
@@ -252,6 +232,14 @@ export const remove = async (req, res, next) => {
         }
 
         await deleteEvent(eventId)
+
+        // Eliminar archivos del evento de Supabase Storage
+        if (event.image_file) {
+            await deleteFile(event.image_file, 'events')
+        }
+        if (event.info_file) {
+            await deleteFile(event.info_file, 'events')
+        }
 
         res.json({
             message: 'Evento eliminado correctamente'

@@ -1,5 +1,4 @@
-import fs from 'fs'
-import path from 'path'
+import { uploadFile, deleteFile, getPublicUrl } from '../services/storage.service.js'
 import {
     insertPiece,
     findPiecesByChoir,
@@ -40,25 +39,11 @@ const validateYouTubeUrl = async (url) => {
     }
 }
 
-// Limpia archivos subidos en caso de error en la petición
-const cleanupUploadedFiles = (files) => {
-    if (!files) return
-    Object.values(files).forEach((fileArr) => {
-        fileArr.forEach((file) => {
-            try {
-                if (fs.existsSync(file.path)) {
-                    fs.unlinkSync(file.path)
-                }
-            } catch (err) {
-                console.error(`Error eliminando archivo temporal: ${file.path}`, err)
-            }
-        })
-    })
-}
+// Limpia archivos subidos en caso de error en la petición (no-op para memoryStorage)
+const cleanupUploadedFiles = (files) => {}
 
 // Formatea las URLs públicas para que el frontend pueda reproducir/descargar
 const formatPieceUrls = (piece, req) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}/uploads/pieces/`
     const fileFields = [
         'partitura_file', 'voz_coral_file', 
         'voz_soprano_file', 'voz_soprano_2_file', 
@@ -75,7 +60,7 @@ const formatPieceUrls = (piece, req) => {
             if (val.startsWith('http://') || val.startsWith('https://')) {
                 formatted[field] = val
             } else {
-                formatted[field] = `${baseUrl}${val}`
+                formatted[field] = getPublicUrl(val, 'pieces')
             }
         }
     })
@@ -99,12 +84,12 @@ export const create = async (req, res, next) => {
 
         const files = req.files || {}
         
-        const getFieldValue = (fieldName, bodyName) => {
+        const uploadPieceFileHelper = async (fieldName) => {
             const fileArr = files[fieldName]
             if (fileArr && fileArr.length > 0) {
-                return fileArr[0].filename
+                return await uploadFile(fileArr[0], 'pieces')
             }
-            const bodyVal = req.body[bodyName] || req.body[fieldName]
+            const bodyVal = req.body[fieldName]
             if (bodyVal && String(bodyVal).trim() !== '') {
                 return String(bodyVal).trim()
             }
@@ -114,18 +99,18 @@ export const create = async (req, res, next) => {
         const pieceData = {
             choirId,
             name,
-            partitura_file: getFieldValue('partitura', 'partitura'),
-            voz_coral_file: getFieldValue('vozCoral', 'voz_coral'),
-            voz_soprano_file: getFieldValue('vozSoprano', 'voz_soprano'),
-            voz_soprano_2_file: hasDivSoprano ? getFieldValue('vozSoprano2', 'voz_soprano_2') : null,
-            voz_contralto_file: getFieldValue('vozContralto', 'voz_contralto'),
-            voz_contralto_2_file: hasDivContralto ? getFieldValue('vozContralto2', 'voz_contralto_2') : null,
-            voz_tenor_file: getFieldValue('vozTenor', 'voz_tenor'),
-            voz_tenor_2_file: hasDivTenor ? getFieldValue('vozTenor2', 'voz_tenor_2') : null,
-            voz_bajo_file: getFieldValue('vozBajo', 'voz_bajo'),
-            voz_bajo_2_file: hasDivBajo ? getFieldValue('vozBajo2', 'voz_bajo_2') : null,
-            base_instrumental_file: getFieldValue('baseInstrumental', 'base_instrumental'),
-            info_adicional_file: hasLyrics ? null : getFieldValue('infoAdicional', 'info_adicional'),
+            partitura_file: await uploadPieceFileHelper('partitura'),
+            voz_coral_file: await uploadPieceFileHelper('vozCoral'),
+            voz_soprano_file: await uploadPieceFileHelper('vozSoprano'),
+            voz_soprano_2_file: hasDivSoprano ? await uploadPieceFileHelper('vozSoprano2') : null,
+            voz_contralto_file: await uploadPieceFileHelper('vozContralto'),
+            voz_contralto_2_file: hasDivContralto ? await uploadPieceFileHelper('vozContralto2') : null,
+            voz_tenor_file: await uploadPieceFileHelper('vozTenor'),
+            voz_tenor_2_file: hasDivTenor ? await uploadPieceFileHelper('vozTenor2') : null,
+            voz_bajo_file: await uploadPieceFileHelper('vozBajo'),
+            voz_bajo_2_file: hasDivBajo ? await uploadPieceFileHelper('vozBajo2') : null,
+            base_instrumental_file: await uploadPieceFileHelper('baseInstrumental'),
+            info_adicional_file: hasLyrics ? null : await uploadPieceFileHelper('infoAdicional'),
             is_visible: isVisible,
             has_lyrics: hasLyrics,
             lyrics: hasLyrics ? (lyrics || null) : null,
@@ -288,7 +273,7 @@ export const update = async (req, res, next) => {
             'vozBajo', 'vozBajo2', 'baseInstrumental', 'infoAdicional'
         ]
 
-        fileFields.forEach(field => {
+        for (const field of fileFields) {
             const fileArr = files[field]
             const dbField = `${field.replace(/([A-Z]|[0-9])/g, '_$1').toLowerCase()}_file`
             
@@ -304,7 +289,8 @@ export const update = async (req, res, next) => {
                 if (existingPiece[dbField] && !existingPiece[dbField].startsWith('http://') && !existingPiece[dbField].startsWith('https://')) {
                     filesToDelete.push(existingPiece[dbField])
                 }
-                updateData[dbField] = fileArr[0].filename
+                const uploadedFilename = await uploadFile(fileArr[0], 'pieces')
+                updateData[dbField] = uploadedFilename
             } else if (bodyVal !== undefined) {
                 const trimmedVal = String(bodyVal).trim()
                 if (trimmedVal !== '') {
@@ -324,7 +310,7 @@ export const update = async (req, res, next) => {
                 }
                 updateData[dbField] = null
             }
-        })
+        }
 
         // Validar URLs de YouTube
         const fieldLabels = {
@@ -356,18 +342,11 @@ export const update = async (req, res, next) => {
             await updatePiece(pieceId, updateData)
         }
 
-        // Borrar archivos reemplazados
-        filesToDelete.forEach(filename => {
-            if (filename.startsWith('http://') || filename.startsWith('https://')) return
-            const filePath = path.join('src/uploads/pieces', filename)
-            try {
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath)
-                }
-            } catch (err) {
-                console.error(`Error borrando archivo reemplazado: ${filePath}`, err)
-            }
-        })
+        // Borrar archivos reemplazados de Supabase Storage
+        for (const filename of filesToDelete) {
+            if (filename.startsWith('http://') || filename.startsWith('https://')) continue
+            await deleteFile(filename, 'pieces')
+        }
 
         res.json({
             message: 'Pieza actualizada correctamente'
@@ -389,7 +368,7 @@ export const remove = async (req, res, next) => {
 
         await deletePiece(pieceId)
 
-        // Borrar todos los archivos físicos asociados
+        // Borrar todos los archivos físicos asociados de Supabase Storage
         const fileFields = [
             'partitura_file', 'voz_coral_file', 
             'voz_soprano_file', 'voz_soprano_2_file', 
@@ -399,19 +378,12 @@ export const remove = async (req, res, next) => {
             'base_instrumental_file', 'info_adicional_file'
         ]
 
-        fileFields.forEach(field => {
+        for (const field of fileFields) {
             const filename = piece[field]
             if (filename && !filename.startsWith('http://') && !filename.startsWith('https://')) {
-                const filePath = path.join('src/uploads/pieces', filename)
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath)
-                    }
-                } catch (err) {
-                    console.error(`Error al borrar el archivo físico ${filePath}:`, err)
-                }
+                await deleteFile(filename, 'pieces')
             }
-        })
+        }
 
         res.json({
             message: 'Pieza eliminada correctamente' 
