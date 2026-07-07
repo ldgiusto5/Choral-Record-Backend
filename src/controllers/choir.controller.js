@@ -328,7 +328,7 @@ export const listFollowers = async (req, res, next) => {
                 name: f.name,
                 username: f.username,
                 profile_image_url: f.user_image
-                    ? `${baseUrl}/uploads/profiles/${f.user_image}`
+                    ? getPublicUrl(f.user_image, 'profiles')
                     : `${baseUrl}/assets/default-avatar.png`
             }
         })

@@ -1,5 +1,6 @@
 import { findChoirById, findUserChoirStatus, followChoir } from '../services/choir.service.js'
 import { findUserById } from '../services/auth.service.js'
+import { getPublicUrl } from '../services/storage.service.js'
 import {
     requestToJoinChoir,
     findPendingRequests,
@@ -53,7 +54,7 @@ const formatMemberAvatarUrl = (member, req) => {
     const formatted = { ...member }
     const baseUrl = `${req.protocol}://${req.get('host')}`
     formatted.profile_image_url = formatted.user_image
-        ? `${baseUrl}/uploads/profiles/${formatted.user_image}`
+        ? getPublicUrl(formatted.user_image, 'profiles')
         : `${baseUrl}/assets/default-avatar.png`
     return formatted
 }
