@@ -1,0 +1,1222 @@
+openapi: 3.1.0
+
+info:
+  title: Choir Management API
+  version: 1.0.0
+  description: API para gestión de coros, miembros y piezas musicales
+
+servers:
+  - url: http://localhost:3000/api
+
+tags:
+  - name: Auth
+  - name: Choirs
+  - name: Members
+  - name: Pieces
+  - name: Events
+
+# =========================
+# GLOBAL SECURITY
+# =========================
+
+security:
+  - bearerAuth: []
+
+# =========================
+# COMPONENTS
+# =========================
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+
+    BadRequest:
+      description: Solicitud incorrecta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: No autorizado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Prohibido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: No encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ServerError:
+      description: Error interno
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Error inesperado
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    Choir:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        image_file:
+          type: string
+          nullable: true
+        place:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        is_public:
+          type: boolean
+          default: true
+        membership:
+          type: object
+          nullable: true
+        member_count:
+          type: integer
+        piece_count:
+          type: integer
+        public_event_count:
+          type: integer
+        member_event_count:
+          type: integer
+        followers_count:
+          type: integer
+        owner:
+          type: string
+        owner_id:
+          type: integer
+
+    Membership:
+      type: object
+      properties:
+        userId:
+          type: integer
+        role:
+          type: string
+          enum: [admin, member]
+        status:
+          type: string
+          enum: [pending, accepted]
+
+    Piece:
+      type: object
+      properties:
+        id:
+          type: integer
+        choirId:
+          type: integer
+        name:
+          type: string
+        partitura_file:
+          type: string
+          nullable: true
+        voz_coral_file:
+          type: string
+          nullable: true
+        voz_soprano_file:
+          type: string
+          nullable: true
+        voz_soprano_2_file:
+          type: string
+          nullable: true
+        voz_contralto_file:
+          type: string
+          nullable: true
+        voz_contralto_2_file:
+          type: string
+          nullable: true
+        voz_tenor_file:
+          type: string
+          nullable: true
+        voz_tenor_2_file:
+          type: string
+          nullable: true
+        voz_bajo_file:
+          type: string
+          nullable: true
+        voz_bajo_2_file:
+          type: string
+          nullable: true
+        base_instrumental_file:
+          type: string
+          nullable: true
+        info_adicional_file:
+          type: string
+          nullable: true
+        is_visible:
+          type: boolean
+          default: true
+        has_lyrics:
+          type: boolean
+          default: false
+        lyrics:
+          type: string
+          nullable: true
+        has_div_soprano:
+          type: boolean
+          default: false
+        has_div_contralto:
+          type: boolean
+          default: false
+        has_div_tenor:
+          type: boolean
+          default: false
+        has_div_bajo:
+          type: boolean
+          default: false
+        createdBy:
+          type: integer
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        choir_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        image_file:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          nullable: true
+        event_date:
+          type: string
+          format: date-time
+        is_visible:
+          type: boolean
+          default: true
+        is_public:
+          type: boolean
+          default: false
+        info_file:
+          type: string
+          nullable: true
+        info_url:
+          type: string
+          nullable: true
+        is_completed:
+          type: boolean
+          default: false
+        created_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+# =========================
+# PATHS
+# =========================
+
+paths:
+
+  # =========================
+  # AUTH
+  # =========================
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Registrar usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, name, email, password]
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Login usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+            example:
+              email: leo@gmail.com
+              password: leoleoleo
+      responses:
+        "200":
+          description: Login correcto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/profile/me/choirs:
+    get:
+      tags: [Choirs]
+      summary: Listar coros de los que soy miembro
+      description: Retorna la lista de todos los coros donde el usuario actualmente autenticado es un miembro activo (con estatus 'accepted').
+      responses:
+        "200":
+          description: Lista de coros del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Choir'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/ServerError'
+
+  /auth/profile/me:
+    get:
+      tags: [Auth]
+      summary: Obtener mi propio perfil de usuario
+      description: Retorna la información de perfil del usuario actualmente autenticado.
+      responses:
+        "200":
+          description: Perfil obtenido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/ServerError'
+
+  /auth/profile/{username_or_id}/choirs:
+    get:
+      tags: [Choirs]
+      summary: Listar coros a los que pertenece otro usuario
+      description: Retorna la lista de todos los coros donde el usuario con el username o ID especificado es un miembro activo (con estatus 'accepted').
+      parameters:
+        - name: username_or_id
+          in: path
+          required: true
+          description: Nombre de usuario o ID numérico externo
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de coros del usuario externo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Choir'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/ServerError'
+
+  /auth/profile/{username_or_id}:
+    get:
+      tags: [Auth]
+      summary: Obtener perfil de usuario por username o ID
+      description: Permite ver el perfil público de cualquier usuario autenticado. Acepta tanto el username como el ID numérico. Retorna isOwner indicando si el perfil pertenece al usuario autenticado.
+      parameters:
+        - name: username_or_id
+          in: path
+          required: true
+          description: Nombre de usuario o ID numérico a consultar
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Perfil obtenido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Auth]
+      summary: Actualizar perfil del usuario autenticado
+      description: Permite editar username, name, description e imagen de perfil. Solo el propietario puede editar su perfil. Acepta tanto el username como el ID numérico del usuario en la ruta. Si username o name están vacíos, se mantienen los valores anteriores. La descripción puede estar vacía. Si no se envía archivo de imagen, se mantiene la anterior o NULL.
+      parameters:
+        - name: username_or_id
+          in: path
+          required: true
+          description: Nombre de usuario o ID numérico a actualizar
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: []
+              properties:
+                username:
+                  type: string
+                  description: Nuevo username (debe estar disponible, no puede estar vacío si se quiere cambiar)
+                name:
+                  type: string
+                  description: Nuevo nombre completo (no puede estar vacío si se quiere cambiar)
+                description:
+                  type: string
+                  description: Descripción del perfil (puede estar vacía)
+                user_image:
+                  type: string
+                  format: binary
+                  description: Imagen de perfil (JPEG, PNG, WEBP, máximo 5MB)
+            examples:
+              emptyProfileUpdate:
+                summary: Valores vacíos para username, name y description
+                value:
+                  username: ""
+                  name: ""
+                  description: ""
+                  user_image: ""
+      responses:
+        "200":
+          description: Perfil actualizado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /auth/profile/{username_or_id}/image:
+    delete:
+      tags: [Auth]
+      summary: Eliminar imagen de perfil
+      description: Permite al usuario eliminar su imagen de perfil. Solo el propietario puede eliminar su imagen. Acepta tanto el username como el ID numérico del usuario en la ruta. Se reemplazará por la imagen predeterminada.
+      parameters:
+        - name: username_or_id
+          in: path
+          required: true
+          description: Nombre de usuario o ID numérico
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Imagen de perfil eliminada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /auth/me:
+    delete:
+      tags: [Auth]
+      summary: Eliminar mi propia cuenta de usuario (hard delete)
+      description: Elimina la cuenta del usuario actualmente autenticado. Se verifica que el usuario no tenga rol de administrador ('admin') ni sea el único administrador de ningún coro antes de borrar la cuenta. Si se incumple alguna regla, retorna error 400.
+      responses:
+        "200":
+          description: Usuario eliminado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Usuario eliminado correctamente
+        "400":
+          description: Error al eliminar usuario (ej. es administrador o es único administrador de un coro)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/ServerError'
+
+  /admin/users/{id}:
+    delete:
+      tags: [Auth]
+      summary: Eliminar un usuario (Solo Administradores)
+      description: Permite a un superadministrador eliminar cualquier cuenta de usuario por su ID, siempre y cuando el usuario objetivo no sea administrador ('admin') ni sea el único administrador de ningún coro.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del usuario a eliminar
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Usuario eliminado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Usuario eliminado por superadmin
+        "400":
+          description: Error al eliminar usuario (ej. es administrador o es único administrador de un coro)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/ServerError'
+
+  # =========================
+  # CHOIRS
+  # =========================
+
+  /choirs:
+    get:
+      tags: [Choirs]
+      summary: Listar coros
+      responses:
+        "200":
+          description: Lista de coros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Choir'
+
+    post:
+      tags: [Choirs]
+      summary: Crear coro
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                is_public:
+                  type: boolean
+                  default: true
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Coro creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  choir:
+                    $ref: '#/components/schemas/Choir'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /choirs/{id}:
+    get:
+      tags: [Choirs]
+      summary: Detalle de coro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Coro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Choir'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Choirs]
+      summary: Editar coro
+      description: Solo el administrador del coro puede editarlo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                is_public:
+                  type: boolean
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Coro actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  choir:
+                    $ref: '#/components/schemas/Choir'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Choirs]
+      summary: Eliminar coro
+      description: Solo el administrador del coro puede eliminarlo. Borra primero las piezas y miembros asociados.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Coro eliminado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # =========================
+  # MEMBERS
+  # =========================
+
+  /choirs/{id}/join:
+    post:
+      tags: [Members]
+      summary: Unirse a un coro
+      description: Si el coro es público, te unes automáticamente. Si es privado, se envía una solicitud que debe ser aceptada por un administrador.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Unido al coro o solicitud enviada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /choirs/{id}/requests:
+    get:
+      tags: [Members]
+      summary: Solicitudes pendientes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista solicitudes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Membership'
+
+  /choirs/{id}/requests/{userId}:
+    put:
+      tags: [Members]
+      summary: Responder solicitud
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, rejected]
+      responses:
+        "200":
+          description: OK
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /choirs/{id}/members:
+    get:
+      tags: [Members]
+      summary: Listar miembros
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista
+
+  /choirs/{id}/members/{userId}/role:
+    put:
+      tags: [Members]
+      summary: Cambiar rol
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [admin, member]
+      responses:
+        "200":
+          description: Rol actualizado
+
+  /choirs/{id}/members/{userId}:
+    delete:
+      tags: [Members]
+      summary: Expulsar o abandonar coro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  # =========================
+  # PIECES
+  # =========================
+
+  /choirs/{id}/pieces:
+    get:
+      tags: [Pieces]
+      summary: Listar piezas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista
+
+    post:
+      tags: [Pieces]
+      summary: Crear pieza
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                partitura:
+                  type: string
+                  format: binary
+                vozCoral:
+                  type: string
+                  format: binary
+                vozSoprano:
+                  type: string
+                  format: binary
+                vozContralto:
+                  type: string
+                  format: binary
+                vozTenor:
+                  type: string
+                  format: binary
+                vozBajo:
+                  type: string
+                  format: binary
+                baseInstrumental:
+                  type: string
+                  format: binary
+                infoAdicional:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Pieza creada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  piece:
+                    $ref: '#/components/schemas/Piece'
+
+  /choirs/{id}/pieces/{pieceId}:
+    get:
+      tags: [Pieces]
+      summary: Detalle pieza
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pieceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Pieces]
+      summary: Actualizar pieza
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pieceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                partitura:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Actualizado
+
+    delete:
+      tags: [Pieces]
+      summary: Eliminar pieza
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pieceId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Eliminado
+
+  /choirs/{id}/events:
+    get:
+      tags: [Events]
+      summary: Listar eventos de un coro
+      description: Devuelve la lista de eventos. Si el usuario es miembro, solo devuelve los visibles. Si es admin/superadmin, devuelve todos.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de eventos obtenida con éxito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+
+    post:
+      tags: [Events]
+      summary: Crear evento en un coro
+      description: Solo para administradores del coro. Permite subir una imagen y un archivo de información.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, event_date]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                event_date:
+                  type: string
+                  format: date-time
+                is_visible:
+                  type: string
+                  enum: ["true", "false", "1", "0"]
+                  default: "true"
+                image:
+                  type: string
+                  format: binary
+                info:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Evento creado con éxito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  event:
+                    $ref: '#/components/schemas/Event'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
+  /choirs/{id}/events/{eventId}:
+    get:
+      tags: [Events]
+      summary: Detalle de un evento
+      description: Obtener detalles de un evento específico. Solo visible para miembros si is_visible = true. Admins ven todos.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detalle del evento obtenido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Events]
+      summary: Actualizar evento
+      description: Solo para administradores del coro. Permite subir nuevos archivos para reemplazar los anteriores.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                event_date:
+                  type: string
+                  format: date-time
+                is_visible:
+                  type: string
+                  enum: ["true", "false", "1", "0"]
+                is_completed:
+                  type: string
+                  enum: ["true", "false", "1", "0"]
+                image:
+                  type: string
+                  format: binary
+                info:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Evento actualizado con éxito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  event:
+                    $ref: '#/components/schemas/Event'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Events]
+      summary: Eliminar evento
+      description: Solo para administradores del coro. Elimina el evento de la base de datos y sus archivos físicos del disco.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Evento eliminado correctamente
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
