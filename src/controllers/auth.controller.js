@@ -90,6 +90,7 @@ export const login = async (req, res, next) => {
             user: {
                 id: user.id,
                 name: user.name,
+                username: user.username,
                 email: user.email,
                 role: user.role
             }
@@ -532,6 +533,7 @@ export const refresh = async (req, res, next) => {
             user: {
                 id: formattedUser.id,
                 name: formattedUser.name,
+                username: formattedUser.username,
                 email: formattedUser.email,
                 role: formattedUser.role,
                 profile_image_url: formattedUser.profile_image_url,
