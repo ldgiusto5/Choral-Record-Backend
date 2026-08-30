@@ -287,8 +287,21 @@ export const findFollowedChoirsEvents = async (userId) => {
         return isPublic || isMember || isOwner
     })
 
-    return allowedEvents.map(e => ({
+    const mappedEvents = allowedEvents.map(e => ({
         ...mapEventRow(e),
         choir_name: e.choirs?.name
     }))
+
+    const oneDayInMs = 24 * 60 * 60 * 1000
+    const now = new Date()
+
+    return mappedEvents.filter(e => {
+        if (e.is_completed) {
+            const eventTime = e.event_date ? new Date(e.event_date).getTime() : 0
+            if (eventTime && now.getTime() > eventTime + oneDayInMs) {
+                return false
+            }
+        }
+        return true
+    })
 }
