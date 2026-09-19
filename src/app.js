@@ -7,6 +7,7 @@ import choirRoutes from './routes/choir.routes.js'
 import memberRoutes from './routes/member.routes.js'
 import pieceRoutes from './routes/piece.routes.js'
 import eventRoutes from './routes/event.routes.js'
+import gameRoutes from './routes/game.routes.js'
 import { notFound } from './middlewares/notFound.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -41,6 +42,7 @@ app.use('/api', choirRoutes)
 app.use('/api', memberRoutes)
 app.use('/api', pieceRoutes)
 app.use('/api', eventRoutes)
+app.use('/api', gameRoutes)
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 

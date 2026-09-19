@@ -55,7 +55,7 @@ export const findUserByUsername = async (username) => {
 export const findUserById = async (id) => {
     const { data, error } = await supabase
         .from('users')
-        .select('id, username, name, email, role, description, user_image, created_at')
+        .select('id, username, name, email, role, description, user_image, created_at, guess_note_score, guess_note_streak, guess_note_last_date, guess_note_perfect_pitch')
         .eq('id', id)
         .maybeSingle()
 
