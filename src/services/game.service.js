@@ -14,14 +14,23 @@ export const getGuessNoteStatusService = async (userId) => {
   if (!user) throw new Error('Usuario no encontrado');
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
   const lastDateStr = user.guess_note_last_date ? String(user.guess_note_last_date).split('T')[0] : null;
   const playedToday = lastDateStr === todayStr;
+  const playedYesterday = lastDateStr === yesterdayStr;
+
+  // Active streak is only preserved if played today or played yesterday
+  const activeStreak = (playedToday || playedYesterday) ? (user.guess_note_streak || 0) : 0;
+  const perfectPitchToday = playedToday ? Boolean(user.guess_note_perfect_pitch) : false;
 
   return {
     score: user.guess_note_score || 0,
-    streak: user.guess_note_streak || 0,
+    streak: activeStreak,
     lastDate: lastDateStr,
-    perfectPitchToday: playedToday ? Boolean(user.guess_note_perfect_pitch) : false,
+    perfectPitchToday,
     playedToday
   };
 };
@@ -68,15 +77,17 @@ export const finishGuessNoteGameService = async (userId, gameResult) => {
 
   const newScore = (user.guess_note_score || 0) + Number(score);
 
+  const updateFields = {
+    guess_note_score: newScore,
+    guess_note_streak: newStreak,
+    guess_note_last_date: todayStr,
+    guess_note_perfect_pitch: Boolean(isPerfectPitch)
+  };
+
   // Update user in Supabase
   const { error: updateErr } = await supabase
     .from('users')
-    .update({
-      guess_note_score: newScore,
-      guess_note_streak: newStreak,
-      guess_note_last_date: todayStr,
-      guess_note_perfect_pitch: Boolean(isPerfectPitch)
-    })
+    .update(updateFields)
     .eq('id', userId);
 
   if (updateErr) throw updateErr;
@@ -86,6 +97,7 @@ export const finishGuessNoteGameService = async (userId, gameResult) => {
     score: newScore,
     streak: newStreak,
     perfectPitchToday: Boolean(isPerfectPitch),
+    has_perfect_pitch_reward: Boolean(isPerfectPitch),
     playedToday: true,
     pointsAdded: Number(score)
   };

@@ -1,5 +1,6 @@
 import { createChoir, findAllChoirs, findChoirById, findUserChoirStatus, updateChoir, deleteChoir, findChoirsByUser, followChoir, unfollowChoir, getFollowStatus, getFollowersCount, findFollowedChoirsByUser, getChoirFollowers } from '../services/choir.service.js'
 import { findUserByUsername, findUserById } from '../services/auth.service.js'
+import { formatUserAvatarUrl } from './auth.controller.js'
 import jwt from 'jsonwebtoken'
 import { uploadFile, deleteFile, getPublicUrl } from '../services/storage.service.js'
 
@@ -320,18 +321,7 @@ export const listFollowers = async (req, res, next) => {
         }
 
         const followers = await getChoirFollowers(choirId)
-        
-        const baseUrl = `${req.protocol}://${req.get('host')}`
-        const formatted = followers.map(f => {
-            return {
-                id: f.id,
-                name: f.name,
-                username: f.username,
-                profile_image_url: f.user_image
-                    ? getPublicUrl(f.user_image, 'profiles')
-                    : `${baseUrl}/assets/default-avatar.png`
-            }
-        })
+        const formatted = followers.map(f => formatUserAvatarUrl(f, req))
 
         res.json({ data: formatted })
     } catch (error) {

@@ -82,7 +82,7 @@ export const updateUser = async (id, data) => {
 export const searchUsers = async (query = '') => {
     const { data, error } = await supabase
         .from('users')
-        .select('id, username, name, email, role, description, user_image, created_at')
+        .select('id, username, name, email, role, description, user_image, created_at, guess_note_score, guess_note_streak, guess_note_last_date, guess_note_perfect_pitch')
         .or(`username.ilike.%${query}%,name.ilike.%${query}%`)
 
     if (error) {

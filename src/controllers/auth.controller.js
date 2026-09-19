@@ -20,7 +20,7 @@ const hashToken = (token) => {
     return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-const formatUserAvatarUrl = (user, req) => {
+export const formatUserAvatarUrl = (user, req) => {
     if (!user) return null
 
     const formatted = { ...user }
@@ -30,6 +30,55 @@ const formatUserAvatarUrl = (user, req) => {
     formatted.profile_image_url = formatted.user_image
         ? getPublicUrl(formatted.user_image, 'profiles')
         : `${baseUrl}/assets/default-avatar.png`
+
+    // Calcular validez de la racha y oído absoluto del día en tiempo real
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const lastDateStr = formatted.guess_note_last_date ? String(formatted.guess_note_last_date).split('T')[0] : null;
+    const playedToday = lastDateStr === todayStr;
+    const playedYesterday = lastDateStr === yesterdayStr;
+
+    // Si no jugó hoy ni ayer, la racha activa es 0 (pierde la racha por saltarse días)
+    formatted.guess_note_streak = (playedToday || playedYesterday) ? (formatted.guess_note_streak || 0) : 0;
+
+    const rawPerfectPitch = Boolean(formatted.guess_note_perfect_pitch);
+    const rawLastDate = formatted.guess_note_last_date;
+
+    // Oído absoluto de HOY solo se muestra como TRUE si jugó hoy y logró los 10 Puntos
+    formatted.guess_note_perfect_pitch = playedToday ? rawPerfectPitch : false;
+
+    // Premio de Marco Especial: Activo mientras tengas Oído Absoluto + 24 Horas adicionales (48h total)
+    const checkPerfectPitchReward = () => {
+        // 1. Si jugó hoy y no logró los 10 puntos (falló), pierde el marco inmediatamente
+        if (playedToday && !rawPerfectPitch) {
+            return false;
+        }
+
+        // 2. Si tiene o tenía registrado Oído Absoluto en la BD (rawPerfectPitch es true)
+        if (rawPerfectPitch) {
+            // Si la victoria fue hoy o ayer (día activo + 24 horas), le otorgamos el marco
+            if (playedToday || playedYesterday || !rawLastDate) {
+                return true;
+            }
+
+            // Comprobar si la fecha de la última partida está dentro de las últimas 48 horas
+            if (rawLastDate) {
+                const playedTime = new Date(rawLastDate).getTime();
+                const now = Date.now();
+                const window48hMs = 48 * 60 * 60 * 1000;
+                if (!isNaN(playedTime) && (now - playedTime <= window48hMs)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
+    formatted.has_perfect_pitch_reward = checkPerfectPitchReward();
 
     return formatted
 }
@@ -411,7 +460,24 @@ export const listUsers = async (req, res, next) => {
         const query = req.query.search || '';
         const users = await searchUsers(query);
         const formatted = users.map(u => formatUserAvatarUrl(u, req));
-        res.json({ data: formatted });
+
+        // Separación por grupos según criterio de búsqueda:
+        // 1. Oído absoluto activo
+        // 2. Con foto de perfil (ordenado aleatoriamente)
+        // 3. Resto de usuarios (ordenado aleatoriamente)
+        const groupReward = formatted.filter(u => u.has_perfect_pitch_reward);
+        const groupWithPhoto = formatted.filter(u => !u.has_perfect_pitch_reward && u.user_image);
+        const groupRest = formatted.filter(u => !u.has_perfect_pitch_reward && !u.user_image);
+
+        const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
+
+        const sortedUsers = [
+            ...groupReward,
+            ...shuffle(groupWithPhoto),
+            ...shuffle(groupRest)
+        ];
+
+        res.json({ data: sortedUsers });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error al buscar usuarios' });

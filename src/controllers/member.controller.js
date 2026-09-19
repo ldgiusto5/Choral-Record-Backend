@@ -1,6 +1,7 @@
 import { findChoirById, findUserChoirStatus, followChoir } from '../services/choir.service.js'
 import { findUserById } from '../services/auth.service.js'
 import { getPublicUrl } from '../services/storage.service.js'
+import { formatUserAvatarUrl } from './auth.controller.js'
 import {
     requestToJoinChoir,
     findPendingRequests,
@@ -51,12 +52,7 @@ export const join = async (req, res, next) => {
 
 const formatMemberAvatarUrl = (member, req) => {
     if (!member) return null
-    const formatted = { ...member }
-    const baseUrl = `${req.protocol}://${req.get('host')}`
-    formatted.profile_image_url = formatted.user_image
-        ? getPublicUrl(formatted.user_image, 'profiles')
-        : `${baseUrl}/assets/default-avatar.png`
-    return formatted
+    return formatUserAvatarUrl(member, req)
 }
 
 export const listRequests = async (req, res, next) => {

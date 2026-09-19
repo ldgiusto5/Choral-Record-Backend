@@ -35,10 +35,13 @@ export const findPendingRequests = async (choirId) => {
             user_id,
             created_at,
             users (
+                id,
                 name,
                 username,
                 email,
-                user_image
+                user_image,
+                guess_note_last_date,
+                guess_note_perfect_pitch
             )
         `)
         .eq('choir_id', choirId)
@@ -51,11 +54,14 @@ export const findPendingRequests = async (choirId) => {
     }
 
     return (data || []).map(row => ({
+        id: row.users?.id || row.user_id,
         user_id: row.user_id,
         name: row.users?.name,
         username: row.users?.username,
         email: row.users?.email,
         user_image: row.users?.user_image,
+        guess_note_last_date: row.users?.guess_note_last_date,
+        guess_note_perfect_pitch: row.users?.guess_note_perfect_pitch,
         created_at: row.created_at
     }))
 }
@@ -94,10 +100,13 @@ export const findChoirMembers = async (choirId) => {
             role,
             created_at,
             users (
+                id,
                 name,
                 username,
                 email,
-                user_image
+                user_image,
+                guess_note_last_date,
+                guess_note_perfect_pitch
             )
         `)
         .eq('choir_id', choirId)
@@ -110,11 +119,14 @@ export const findChoirMembers = async (choirId) => {
 
     // Map to flat structure and sort in JS
     const mapped = (data || []).map(row => ({
+        id: row.users?.id || row.user_id,
         user_id: row.user_id,
         name: row.users?.name,
         username: row.users?.username,
         email: row.users?.email,
         user_image: row.users?.user_image,
+        guess_note_last_date: row.users?.guess_note_last_date,
+        guess_note_perfect_pitch: row.users?.guess_note_perfect_pitch,
         role: row.role,
         created_at: row.created_at
     }))

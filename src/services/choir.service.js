@@ -355,7 +355,9 @@ export const getChoirFollowers = async (choirId) => {
                 id,
                 name,
                 username,
-                user_image
+                user_image,
+                guess_note_last_date,
+                guess_note_perfect_pitch
             )
         `)
         .eq('choir_id', choirId)
@@ -370,6 +372,8 @@ export const getChoirFollowers = async (choirId) => {
         id: row.users?.id,
         name: row.users?.name,
         username: row.users?.username,
-        user_image: row.users?.user_image
+        user_image: row.users?.user_image,
+        guess_note_last_date: row.users?.guess_note_last_date,
+        guess_note_perfect_pitch: row.users?.guess_note_perfect_pitch
     })).filter(u => u.id !== undefined)
 }
